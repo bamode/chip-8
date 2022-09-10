@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 bitvec = "0.22"
+clap = "3.2"
 crossterm = "0.25"
+rand = "0.8"
