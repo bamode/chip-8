@@ -1,10 +1,13 @@
 use crate::cpu::*;
 use crate::terminal::*;
 
+use std::time::{Duration, Instant};
+
 #[derive(Debug)]
 pub struct Chip8 {
     pub cpu: Cpu,
     clock: Clock,
+    timer: Instant,
     term: Terminal,
 }
 
@@ -12,8 +15,14 @@ impl Chip8 {
     pub fn new() -> Self {
         let cpu = Cpu::new();
         let clock = Clock;
+        let timer = Instant::now();
         let term = Terminal;
-        Chip8 { cpu, clock, term }
+        Chip8 {
+            cpu,
+            clock,
+            timer,
+            term,
+        }
     }
     pub fn run(&mut self) -> std::result::Result<(), TerminalError> {
         self.term.clear_screen()?;
@@ -25,12 +34,17 @@ impl Chip8 {
                 Chip8Message::ClearScreen => self.term.clear_screen()?,
                 Chip8Message::DrawScreen => self.term.draw_screen(&self.cpu.disp)?,
             }
-            if self.cpu.dt > 0 {
-                self.cpu.dt -= 1;
+            let now = Instant::now();
+            if now - self.timer > Duration::from_secs_f64(1. / 60.) {
+                self.timer = now;
+                if self.cpu.dt > 0 {
+                    self.cpu.dt -= 1;
+                }
+                if self.cpu.st > 0 {
+                    self.cpu.st -= 1;
+                }
             }
-            if self.cpu.st > 0 {
-                self.cpu.st -= 1;
-            }
+
             self.clock.tick();
         }
     }
@@ -54,8 +68,6 @@ pub struct Clock;
 
 impl Clock {
     pub fn tick(&self) {
-        std::thread::sleep(std::time::Duration::from_millis(
-            (1. / CLOCK_RATE * 1000.).round() as u64,
-        ));
+        std::thread::sleep(std::time::Duration::from_millis(2));
     }
 }

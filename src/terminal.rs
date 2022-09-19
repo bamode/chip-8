@@ -3,7 +3,7 @@ use crossterm::{
     style::{self, Stylize},
     terminal,
     terminal::size,
-    QueueableCommand, 
+    QueueableCommand,
 };
 use std::io::{stdout, Write};
 

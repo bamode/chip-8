@@ -9,13 +9,7 @@ pub struct RawOpcode {
 
 impl RawOpcode {
     pub fn new(op: u16, x: u16, y: u16, n: u16, kk: u16) -> Self {
-        RawOpcode {
-            op,
-            x,
-            y,
-            n,
-            kk,
-        }
+        RawOpcode { op, x, y, n, kk }
     }
 }
 
@@ -108,7 +102,7 @@ impl std::convert::From<&RawOpcode> for Opcode {
                 _ => unreachable!(),
             },
             0xF => match raw_op.kk {
-                7 => return Opcode::SetVXToDT,
+                0x07 => return Opcode::SetVXToDT,
                 0x15 => return Opcode::SetDTToVX,
                 0x18 => return Opcode::SetSTToVX,
                 0x1E => return Opcode::AddI,

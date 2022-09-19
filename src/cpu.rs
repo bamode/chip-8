@@ -246,6 +246,7 @@ impl Cpu {
         for (i, sr) in self.stack.iter().enumerate() {
             if *sr == 0 {
                 stop = i;
+                break;
             }
         }
         self.stack[stop] = self.pc;
@@ -558,5 +559,111 @@ impl Cpu {
         for i in 0..=x {
             self.reg[i as usize] = self.mem[self.index as usize + i as usize];
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_jump() {
+        let mut cpu = Cpu::new();
+        cpu.execute_instruction(0x1234);
+        assert_eq!(cpu.pc, 0x234);
+    }
+
+    #[test]
+    fn test_return_sub() {
+        let mut cpu = Cpu::new();
+        cpu.stack[0] = 0x222;
+        cpu.execute_instruction(0x00EE);
+        assert_eq!(cpu.pc, 0x222);
+    }
+
+    #[test]
+    fn test_goto_sub() {
+        let mut cpu = Cpu::new();
+        cpu.pc = 1;
+        cpu.execute_instruction(0x2123);
+        assert_eq!(cpu.pc, 0x123);
+        assert_eq!(cpu.stack[0], 1);
+    }
+
+    #[test]
+    fn test_skip_equal() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 0x01;
+        cpu.execute_instruction(0x3001);
+        assert_eq!(cpu.pc, 0x202);
+    }
+    
+    #[test]
+    fn test_skip_not_equal() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 0x02;
+        cpu.execute_instruction(0x4001);
+        assert_eq!(cpu.pc, 0x202);
+    }
+
+    #[test]
+    fn test_skip_vx_equal_vy() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 1;
+        cpu.reg[1] = 1;
+        cpu.execute_instruction(0x5010);
+        assert_eq!(cpu.pc, 0x202);
+    }
+
+    #[test]
+    fn test_set_vx() {
+        let mut cpu = Cpu::new();
+        cpu.execute_instruction(0x6012);
+        assert_eq!(cpu.reg[0], 0x12);
+    }
+
+    #[test]
+    fn test_add_without_carry() {
+        let mut cpu = Cpu::new();
+        cpu.reg[1] = 0x1;
+        cpu.execute_instruction(0x7112);
+        assert_eq!(cpu.reg[1], 0x13);
+        assert_eq!(cpu.reg[0xF], 0x0);
+    }
+
+    #[test]
+    fn test_set_vx_to_vy() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 1;
+        cpu.reg[1] = 2;
+        cpu.execute_instruction(0x8010);
+        assert_eq!(cpu.reg[0], 2);
+    }
+
+    #[test]
+    fn test_binary_or() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 0b010;
+        cpu.reg[1] = 0b110;
+        cpu.execute_instruction(0x8011);
+        assert_eq!(cpu.reg[0], 0b110);
+    }
+
+    #[test]
+    fn test_binary_and() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 0b011;
+        cpu.reg[1] = 0b110;
+        cpu.execute_instruction(0x8012);
+        assert_eq!(cpu.reg[0], 0b010);
+    }
+    
+    #[test]
+    fn test_binary_xor() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 0b011;
+        cpu.reg[1] = 0b111;
+        cpu.execute_instruction(0x8013);
+        assert_eq!(cpu.reg[0], 0b100);
     }
 }
