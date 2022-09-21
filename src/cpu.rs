@@ -428,7 +428,7 @@ impl Cpu {
 
     fn random(&mut self, x: u16, nn: u16) {
         let r = rand::random::<u8>();
-        self.reg[x as usize] = r & nn as u8;
+        self.reg[x as usize] = r & (nn as u8);
     }
 
     fn font_character(&mut self, x: u16) {
@@ -523,6 +523,7 @@ impl Cpu {
 
     fn shift_left(&mut self, x: u16, _y: u16) {
         let flag = self.reg[x as usize] & 0b1000_0000;
+        let flag = flag >> 7;
         self.reg[x as usize] = self.reg[x as usize] << 1;
         self.reg[0xF] = flag;
     }
@@ -665,5 +666,89 @@ mod test {
         cpu.reg[1] = 0b111;
         cpu.execute_instruction(0x8013);
         assert_eq!(cpu.reg[0], 0b100);
+    }
+
+    #[test]
+    fn test_add_with_carry() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 128;
+        cpu.reg[1] = 128;
+        cpu.execute_instruction(0x8014);
+        assert_eq!(cpu.reg[0], 0);
+        assert_eq!(cpu.reg[0xF], 1);
+
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 2;
+        cpu.reg[1] = 3;
+        cpu.execute_instruction(0x8014);
+        assert_eq!(cpu.reg[0], 5);
+        assert_eq!(cpu.reg[0xF], 0);
+    }
+
+    #[test]
+    fn test_sub_vy_from_vx() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 4;
+        cpu.reg[1] = 2;
+        cpu.execute_instruction(0x8015);
+        assert_eq!(cpu.reg[0], 2);
+        assert_eq!(cpu.reg[0xF], 1);
+
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 2;
+        cpu.reg[1] = 4;
+        cpu.execute_instruction(0x8015);
+        assert_eq!(cpu.reg[0], 254);
+        assert_eq!(cpu.reg[0xF], 0);
+    }
+
+    #[test]
+    fn test_shift_right() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 0xFF;
+        cpu.execute_instruction(0x8016);
+        assert_eq!(cpu.reg[0], 0x7F);
+        assert_eq!(cpu.reg[0xF], 1);
+    }
+
+    #[test]
+    fn test_shift_left() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 0xFF;
+        cpu.execute_instruction(0x801E);
+        assert_eq!(cpu.reg[0], 0xFE);
+        assert_eq!(cpu.reg[0xF], 1);
+    }
+
+    #[test]
+    fn test_skip_vx_not_equal_vy() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 1;
+        cpu.execute_instruction(0x9010);
+        assert_eq!(cpu.pc, 0x202);
+        cpu.reg[1] = 1;
+        cpu.execute_instruction(0x9010);
+        assert_eq!(cpu.pc, 0x202);
+    }
+
+    #[test]
+    fn test_set_index() {
+        let mut cpu = Cpu::new();
+        cpu.execute_instruction(0xA123);
+        assert_eq!(cpu.index, 0x123);
+    }
+
+    #[test]
+    fn test_jump_with_offset() {
+        let mut cpu = Cpu::new();
+        cpu.reg[0] = 1;
+        cpu.execute_instruction(0xB123);
+        assert_eq!(cpu.pc, 0x124)
+    }
+
+    #[test]
+    fn test_draw() {
+        let mut cpu = Cpu::new();
+        cpu.mem[0] = 1;
     }
 }
