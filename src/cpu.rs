@@ -1,6 +1,8 @@
-use crate::chip::Chip8Message;
+use crate::chip::{Chip8Message, KeyCode};
 use crate::opcode::*;
 use bitvec::prelude::*;
+
+use std::sync::mpsc::Receiver;
 
 type Memory = [u8; 4096];
 type Display = [[u8; 32]; 64];
@@ -24,6 +26,7 @@ pub struct Cpu {
     pub st: SoundTimer,
     reg: Register,
     pc: ProgramCounter,
+    rx: Receiver<KeyCode>
 }
 
 pub const FONT_SET: [u8; 80] = [
@@ -46,7 +49,7 @@ pub const FONT_SET: [u8; 80] = [
 ];
 
 impl Cpu {
-    pub fn new() -> Self {
+    pub fn new(rx: Receiver<KeyCode>) -> Self {
         let mem = [0u8; 4096];
         let disp = [[0u8; 32]; 64];
         let index = 0;
@@ -65,6 +68,7 @@ impl Cpu {
             st,
             reg,
             pc,
+            rx,
         }
     }
 
@@ -161,7 +165,7 @@ impl Cpu {
             }
             Opcode::Draw => {
                 self.draw(x, y, n);
-                Chip8Message::DrawScreen
+                Chip8Message::DrawScreen(self.disp)
             }
             Opcode::SetVXToVY => {
                 self.set_vx_to_vy(x, y);
@@ -279,126 +283,99 @@ impl Cpu {
 
     fn skip_if_key(&mut self, x: u16) {
         let key = self.reg[x as usize];
-        let keystate = crossterm::event::poll(std::time::Duration::from_secs(0)).unwrap();
-        if keystate {
-            let keypress = match crossterm::event::read().unwrap() {
-                crossterm::event::Event::Key(crossterm::event::KeyEvent { code, .. }) => code,
-                _ => crossterm::event::KeyCode::Null,
-            };
-            let keypress: Option<u8> = match keypress {
-                crossterm::event::KeyCode::Char(c) => match c {
-                    '1' => Some(1),
-                    '2' => Some(2),
-                    '3' => Some(3),
-                    '4' => Some(0xC),
-                    'q' => Some(4),
-                    'w' => Some(5),
-                    'e' => Some(6),
-                    'r' => Some(0xD),
-                    'a' => Some(7),
-                    's' => Some(8),
-                    'd' => Some(9),
-                    'f' => Some(0xF),
-                    'z' => Some(0xA),
-                    'x' => Some(0),
-                    'c' => Some(0xB),
-                    'v' => Some(0xF),
-                    _ => None,
-                },
-                crossterm::event::KeyCode::Null | _ => None,
-            };
-            if let Some(k) = keypress {
-                if k == key {
-                    self.pc += 2;
-                }
+        let keystate = self.rx.try_recv();
+        let keycode = match keystate {
+            Ok(kc) => kc,
+            Err(_) => KeyCode::Null,
+        };
+        let keypress = match keycode {
+            KeyCode::Null => None,
+            KeyCode::Quit => None,
+            KeyCode::Key0 => Some(0),
+            KeyCode::Key1 => Some(1),
+            KeyCode::Key2 => Some(2),
+            KeyCode::Key3 => Some(3),
+            KeyCode::Key4 => Some(4),
+            KeyCode::Key5 => Some(5),
+            KeyCode::Key6 => Some(6),
+            KeyCode::Key7 => Some(7),
+            KeyCode::Key8 => Some(8),
+            KeyCode::Key9 => Some(9),
+            KeyCode::KeyA => Some(0xA),
+            KeyCode::KeyB => Some(0xB),
+            KeyCode::KeyC => Some(0xC),
+            KeyCode::KeyD => Some(0xD),
+            KeyCode::KeyE => Some(0xE),
+            KeyCode::KeyF => Some(0xF),
+        };
+
+        if let Some(k) = keypress {
+            if k == key {
+                self.pc += 2;
             }
         }
     }
 
     fn skip_if_not_key(&mut self, x: u16) {
         let key = self.reg[x as usize];
-        let keystate = crossterm::event::poll(std::time::Duration::from_secs(0)).unwrap();
-        if keystate {
-            let keypress = match crossterm::event::read().unwrap() {
-                crossterm::event::Event::Key(crossterm::event::KeyEvent { code, .. }) => code,
-                _ => crossterm::event::KeyCode::Null,
-            };
-            let keypress: Option<u8> = match keypress {
-                crossterm::event::KeyCode::Char(c) => match c {
-                    '1' => Some(1),
-                    '2' => Some(2),
-                    '3' => Some(3),
-                    '4' => Some(0xC),
-                    'q' => Some(4),
-                    'w' => Some(5),
-                    'e' => Some(6),
-                    'r' => Some(0xD),
-                    'a' => Some(7),
-                    's' => Some(8),
-                    'd' => Some(9),
-                    'f' => Some(0xF),
-                    'z' => Some(0xA),
-                    'x' => Some(0),
-                    'c' => Some(0xB),
-                    'v' => Some(0xF),
-                    _ => None,
-                },
-                crossterm::event::KeyCode::Null | _ => None,
-            };
-            if let Some(k) = keypress {
-                if k != key {
-                    self.pc += 2;
-                    return;
-                }
-            } else {
+        let keystate = self.rx.try_recv();
+        let keycode = match keystate {
+            Ok(kc) => kc,
+            Err(_) => KeyCode::Null,
+        };
+        let keypress = match keycode {
+            KeyCode::Null => None,
+            KeyCode::Quit => None,
+            KeyCode::Key0 => Some(0),
+            KeyCode::Key1 => Some(1),
+            KeyCode::Key2 => Some(2),
+            KeyCode::Key3 => Some(3),
+            KeyCode::Key4 => Some(4),
+            KeyCode::Key5 => Some(5),
+            KeyCode::Key6 => Some(6),
+            KeyCode::Key7 => Some(7),
+            KeyCode::Key8 => Some(8),
+            KeyCode::Key9 => Some(9),
+            KeyCode::KeyA => Some(0xA),
+            KeyCode::KeyB => Some(0xB),
+            KeyCode::KeyC => Some(0xC),
+            KeyCode::KeyD => Some(0xD),
+            KeyCode::KeyE => Some(0xE),
+            KeyCode::KeyF => Some(0xF),
+        };
+
+        if let Some(k) = keypress {
+            if k != key {
                 self.pc += 2;
-                return;
             }
         } else {
             self.pc += 2;
-            return;
         }
     }
 
     fn get_key(&mut self, x: u16) {
-        let ret = crossterm::event::poll(std::time::Duration::from_secs(0)).unwrap();
-        if ret {
-            let keypress = match crossterm::event::read().unwrap() {
-                crossterm::event::Event::Key(crossterm::event::KeyEvent { code, .. }) => code,
-                _ => crossterm::event::KeyCode::Null,
-            };
-            let keypress: Option<u8> = match keypress {
-                crossterm::event::KeyCode::Char(c) => match c {
-                    '1' => Some(1),
-                    '2' => Some(2),
-                    '3' => Some(3),
-                    '4' => Some(0xC),
-                    'q' => Some(4),
-                    'w' => Some(5),
-                    'e' => Some(6),
-                    'r' => Some(0xD),
-                    'a' => Some(7),
-                    's' => Some(8),
-                    'd' => Some(9),
-                    'f' => Some(0xF),
-                    'z' => Some(0xA),
-                    'x' => Some(0),
-                    'c' => Some(0xB),
-                    'v' => Some(0xF),
-                    _ => None,
-                },
-                crossterm::event::KeyCode::Null | _ => None,
-            };
-            if let Some(k) = keypress {
-                self.reg[x as usize] = k;
-            } else {
-                self.pc -= 2;
-                return;
-            }
-        } else {
-            self.pc -= 2;
-            return;
-        }
+        let keycode = self.rx.recv().unwrap();
+        let keypress = match keycode {
+            KeyCode::Null => return self.get_key(x),
+            KeyCode::Quit => panic!("quit detected!"),
+            KeyCode::Key0 => (0),
+            KeyCode::Key1 => (1),
+            KeyCode::Key2 => (2),
+            KeyCode::Key3 => (3),
+            KeyCode::Key4 => (4),
+            KeyCode::Key5 => (5),
+            KeyCode::Key6 => (6),
+            KeyCode::Key7 => (7),
+            KeyCode::Key8 => (8),
+            KeyCode::Key9 => (9),
+            KeyCode::KeyA => (0xA),
+            KeyCode::KeyB => (0xB),
+            KeyCode::KeyC => (0xC),
+            KeyCode::KeyD => (0xD),
+            KeyCode::KeyE => (0xE),
+            KeyCode::KeyF => (0xF),
+        };
+        self.reg[x as usize] = keypress;
     }
 
     fn set_vx(&mut self, x: u16, nn: u16) {
@@ -569,14 +546,16 @@ mod test {
 
     #[test]
     fn test_jump() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.execute_instruction(0x1234);
         assert_eq!(cpu.pc, 0x234);
     }
 
     #[test]
     fn test_return_sub() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.stack[0] = 0x222;
         cpu.execute_instruction(0x00EE);
         assert_eq!(cpu.pc, 0x222);
@@ -584,7 +563,8 @@ mod test {
 
     #[test]
     fn test_goto_sub() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.pc = 1;
         cpu.execute_instruction(0x2123);
         assert_eq!(cpu.pc, 0x123);
@@ -593,15 +573,17 @@ mod test {
 
     #[test]
     fn test_skip_equal() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 0x01;
         cpu.execute_instruction(0x3001);
         assert_eq!(cpu.pc, 0x202);
     }
-    
+
     #[test]
     fn test_skip_not_equal() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 0x02;
         cpu.execute_instruction(0x4001);
         assert_eq!(cpu.pc, 0x202);
@@ -609,7 +591,8 @@ mod test {
 
     #[test]
     fn test_skip_vx_equal_vy() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 1;
         cpu.reg[1] = 1;
         cpu.execute_instruction(0x5010);
@@ -618,14 +601,16 @@ mod test {
 
     #[test]
     fn test_set_vx() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.execute_instruction(0x6012);
         assert_eq!(cpu.reg[0], 0x12);
     }
 
     #[test]
     fn test_add_without_carry() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[1] = 0x1;
         cpu.execute_instruction(0x7112);
         assert_eq!(cpu.reg[1], 0x13);
@@ -634,7 +619,8 @@ mod test {
 
     #[test]
     fn test_set_vx_to_vy() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 1;
         cpu.reg[1] = 2;
         cpu.execute_instruction(0x8010);
@@ -643,7 +629,8 @@ mod test {
 
     #[test]
     fn test_binary_or() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 0b010;
         cpu.reg[1] = 0b110;
         cpu.execute_instruction(0x8011);
@@ -652,16 +639,18 @@ mod test {
 
     #[test]
     fn test_binary_and() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 0b011;
         cpu.reg[1] = 0b110;
         cpu.execute_instruction(0x8012);
         assert_eq!(cpu.reg[0], 0b010);
     }
-    
+
     #[test]
     fn test_binary_xor() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 0b011;
         cpu.reg[1] = 0b111;
         cpu.execute_instruction(0x8013);
@@ -670,14 +659,16 @@ mod test {
 
     #[test]
     fn test_add_with_carry() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 128;
         cpu.reg[1] = 128;
         cpu.execute_instruction(0x8014);
         assert_eq!(cpu.reg[0], 0);
         assert_eq!(cpu.reg[0xF], 1);
 
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 2;
         cpu.reg[1] = 3;
         cpu.execute_instruction(0x8014);
@@ -687,14 +678,16 @@ mod test {
 
     #[test]
     fn test_sub_vy_from_vx() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 4;
         cpu.reg[1] = 2;
         cpu.execute_instruction(0x8015);
         assert_eq!(cpu.reg[0], 2);
         assert_eq!(cpu.reg[0xF], 1);
 
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 2;
         cpu.reg[1] = 4;
         cpu.execute_instruction(0x8015);
@@ -704,7 +697,8 @@ mod test {
 
     #[test]
     fn test_shift_right() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 0xFF;
         cpu.execute_instruction(0x8016);
         assert_eq!(cpu.reg[0], 0x7F);
@@ -713,7 +707,8 @@ mod test {
 
     #[test]
     fn test_shift_left() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 0xFF;
         cpu.execute_instruction(0x801E);
         assert_eq!(cpu.reg[0], 0xFE);
@@ -722,7 +717,8 @@ mod test {
 
     #[test]
     fn test_skip_vx_not_equal_vy() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 1;
         cpu.execute_instruction(0x9010);
         assert_eq!(cpu.pc, 0x202);
@@ -733,14 +729,16 @@ mod test {
 
     #[test]
     fn test_set_index() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.execute_instruction(0xA123);
         assert_eq!(cpu.index, 0x123);
     }
 
     #[test]
     fn test_jump_with_offset() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.reg[0] = 1;
         cpu.execute_instruction(0xB123);
         assert_eq!(cpu.pc, 0x124)
@@ -748,7 +746,8 @@ mod test {
 
     #[test]
     fn test_draw() {
-        let mut cpu = Cpu::new();
+        let (_tx, rx) = std::sync::mpsc::channel();
+        let mut cpu = Cpu::new(rx);
         cpu.mem[0] = 1;
     }
 }

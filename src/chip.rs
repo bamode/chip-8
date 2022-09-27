@@ -1,6 +1,7 @@
 use crate::cpu::*;
-use crate::terminal::*;
 
+use std::path::PathBuf;
+use std::sync::mpsc::{channel, Receiver, Sender, SendError};
 use std::time::{Duration, Instant};
 
 #[derive(Debug)]
@@ -8,31 +9,57 @@ pub struct Chip8 {
     pub cpu: Cpu,
     clock: Clock,
     timer: Instant,
-    term: Terminal,
+    tx: Sender<Chip8Message>,
+}
+
+#[derive(Clone, Debug)]
+pub enum KeyCode {
+    Key0,
+    Key1,
+    Key2,
+    Key3,
+    Key4,
+    Key5,
+    Key6,
+    Key7,
+    Key8,
+    Key9,
+    KeyA,
+    KeyB,
+    KeyC,
+    KeyD,
+    KeyE,
+    KeyF,
+    Null, // No key pressed
+    Quit, // Escape or Ctrl+C would be good
 }
 
 impl Chip8 {
-    pub fn new() -> Self {
-        let cpu = Cpu::new();
+    pub fn new(rx: Receiver<KeyCode>) -> (Chip8, Receiver<Chip8Message>) {
+        let cpu = Cpu::new(rx);
         let clock = Clock;
         let timer = Instant::now();
-        let term = Terminal;
-        Chip8 {
-            cpu,
-            clock,
-            timer,
-            term,
-        }
+        let (tx, chip_rx) = channel();
+        (
+            Chip8 {
+                cpu,
+                clock,
+                timer,
+                tx,
+            },
+            chip_rx,
+        )
     }
-    pub fn run(&mut self) -> std::result::Result<(), TerminalError> {
-        self.term.clear_screen()?;
+
+    pub fn run(&mut self) -> std::result::Result<(), SendError<Chip8Message>> {
+        self.tx.send(Chip8Message::ClearScreen).unwrap();
         loop {
             let next_inst = self.cpu.fetch_next();
             let msg = self.cpu.execute_instruction(next_inst);
             match msg {
                 Chip8Message::None => {}
-                Chip8Message::ClearScreen => self.term.clear_screen()?,
-                Chip8Message::DrawScreen => self.term.draw_screen(&self.cpu.disp)?,
+                Chip8Message::ClearScreen => self.tx.send(Chip8Message::ClearScreen)?,
+                Chip8Message::DrawScreen(d) => self.tx.send(Chip8Message::DrawScreen(d))?,
             }
             let now = Instant::now();
             if now - self.timer > Duration::from_secs_f64(1. / 60.) {
@@ -53,12 +80,20 @@ impl Chip8 {
             self.cpu.mem[i + 0x50] = *byte;
         }
     }
+
+    pub fn load_rom(&mut self, path: PathBuf) {
+        let file = std::fs::read(path).unwrap();
+        let file = file.as_slice();
+        for (i, byte) in file.iter().enumerate() {
+            self.cpu.mem[i + 0x200] = *byte;
+        }
+    }
 }
 
 pub enum Chip8Message {
     None,
     ClearScreen,
-    DrawScreen,
+    DrawScreen([[u8; 32]; 64]),
 }
 
 pub const CLOCK_RATE: f64 = 100.; // Hz, 700 instructions per second
