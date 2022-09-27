@@ -90,6 +90,7 @@ impl Chip8 {
     }
 }
 
+#[derive(Debug)]
 pub enum Chip8Message {
     None,
     ClearScreen,
