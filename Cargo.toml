@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+funty = "2.0"
 bitvec = "0.22"
 clap = "3.2"
 crossterm = "0.25"
